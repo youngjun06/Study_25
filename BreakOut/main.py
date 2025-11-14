@@ -1,118 +1,172 @@
-'''
-게임이 시작되면 위에서는 무작위로 블록 생성 한 줄, 바닥 가운데서 공 하나 생성
-공을 한번 쏘면 이전 블록은 한칸 내려오고, 상단에 새로운 블록 생성 점수 +1
-블록이 끝까지 내려오면 끝
-'''
-
 import pygame
 import random
 
-pygame.init()
+# 상수 정의
+WIDTH, HEIGHT = 360, 640
+WHITE = (255, 255, 255)
+BLACK = (0, 0, 0)
+RED = (255, 0, 0)
+BLUE = (0, 0, 255)
+GRAY = (100, 100, 100)
+FPS = 60
 
-# Screen setting
-width, height = 360, 640
-screen = pygame.display.set_mode((width, height))
-pygame.display.set_caption("Break Out")
-clock = pygame.time.Clock()
+# 블록 관리
+class Block(pygame.sprite.Sprite):
+    def __init__(self, x, y, color):
+        super().__init__()
+        # 벽돌 크기
+        self.w, self.h = 40, 20
+        self.image = pygame.Surface([self.w, self.h])
+        self.image.fill(color)
+        # 벽돌 위치
+        self.rect = self.image.get_rect()
+        self.rect.x = x
+        self.rect.y = y
+        self.hit_count = 1
+    def take_hit(self):
+        self.hit_count -= 1
+        if self.hit_count <= 0:
+            self.kill()
+            return True
+        return False
 
-# Font
-title_font = pygame.font.SysFont("showcardgothic", 45, False, False)
-any_font = pygame.font.SysFont(None, 30, False, False)
-start_font = pygame.font.SysFont(None, 100)
+# 메인 게임 관리
+class BreakOutGame:
+    def __init__(self):
+        pygame.init()
+        self.screen = pygame.display.set_mode((WIDTH, HEIGHT))
+        pygame.display.set_caption("Break Out")
+        self.clock = pygame.time.Clock() # 시간제어
 
-# Button
-start_button = pygame.Rect(width // 2 - 80, height // 2, 160, 50)
-recode_button = pygame.Rect(width // 2 - 80, height // 2 + 80, 160, 50)
-exit_button = pygame.Rect(width // 2 - 80, height // 2 + 160, 160, 50)
-back_button = pygame.Rect(width // 2 - 80, height // 2 + 160, 160, 50)
+        # 폰트
+        self.TITLE_FONT = pygame.font.SysFont("showcardgothic", 45, False, False)
+        self.ANY_FONT = pygame.font.SysFont(None, 30, False, False)
+        self.START_FONT = pygame.font.SysFont(None, 100)
 
-# Default
-screen_state = "start"
-running = True
-game_start = False
-countdown = 3
+        # 버튼 초기화
+        self.START_BUTTON = pygame.Rect(WIDTH//2-80, HEIGHT//2, 160, 50)
+        self.RECODE_BUTTON = pygame.Rect(WIDTH//2-80, HEIGHT//2+80, 160, 50)
+        self.EXIT_BUTTON = pygame.Rect(WIDTH//2-80, HEIGHT//2+160, 160, 50)
+        self.BACK_BUTTON = self.EXIT_BUTTON
 
-def ControlGame():
-    global screen_state, running
-    for event in pygame.event.get():
-        if event.type == pygame.QUIT:
-            running = False
-        elif event.type == pygame.MOUSEBUTTONDOWN:
-            if screen_state == "start":
-                if start_button.collidepoint(event.pos):
-                    screen_state = "game"
-                    
+        # 게임 상태 변수
+        self.screen_state = "start"
+        self.running = True
+        self.game_start = False
+        self.countdown_time = 3
+        self.countdown_start_ticks = 0
 
-                elif recode_button.collidepoint(event.pos):
-                    screen_state = "recode"
-                elif exit_button.collidepoint(event.pos):
-                    running = False
-            elif screen_state == "recode":
-                if back_button.collidepoint(event.pos):
-                    screen_state = "start"
-            # elif screen_state == "game":
+        # 게임 객체, 그룹 생성
+        self.all_sprites = pygame.sprite.Group()
+        self.blocks = pygame.sprite.Group()
 
+        self.creat_blocks()
 
-def StartScreen():
-    screen.fill((250, 250, 250))
-    # Title
-    title_text = title_font.render("<Break Out>", True, (0, 0, 0))
-    title_rect = title_text.get_rect(center=(width // 2, height // 2 - 180))
-    screen.blit(title_text, title_rect)
+    def creat_blocks(self):
+        colors = [RED, (255, 255, 0), (255, 165, 0), (0, 128, 0)]
+        for row_index in range(4):
+            for col_index in range(5):
+                x = 30+col_index*(40+20)
+                y = 50+row_index*(20+10)
+                color = colors[row_index]
 
-    # Start button
-    pygame.draw.ellipse(screen, (255, 0, 0), start_button)
-    start_button_text = any_font.render("Start", True, (255, 255, 255))
-    start_button_rect = start_button_text.get_rect(center=(start_button.center))
-    screen.blit(start_button_text, start_button_rect)
+                block = Block(x, y, color)
+                self.blocks.add(block)
+                self.all_sprites.add(block)
 
-    # Recode button
-    pygame.draw.ellipse(screen, (100, 100, 100), recode_button)
-    recode_button_text = any_font.render("Recode", True, (255, 255, 255))
-    recode_button_rect = recode_button_text.get_rect(center=(recode_button.center))
-    screen.blit(recode_button_text, recode_button_rect)
+    def handle_input(self):
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                self.running = False
+            elif event.type == pygame.MOUSEBUTTONDOWN:
+                if self.screen_state == "start":
+                    if self.START_BUTTON.collidepoint(event.pos):
+                        self.screen_state = "game"
+                        self.countdown_start_ticks = pygame.time.get_ticks()
+                    elif self.RECODE_BUTTON.collidepoint(event.pos):
+                        self.screen_state = "recode"
+                    elif self.EXIT_BUTTON.collidepoint(event.pos):
+                        self.running = False
+                elif self.screen_state == "recode":
+                    if self.BACK_BUTTON.collidepoint(event.pos):
+                        self.screen_state = "start"
 
-    # Exit button
-    pygame.draw.ellipse(screen, (50, 50, 50), exit_button)
-    exit_button_text = any_font.render("Exit", True, (255, 255, 255))
-    exit_button_rect = exit_button_text.get_rect(center=(exit_button.center))
-    screen.blit(exit_button_text, exit_button_rect)
+    def game_logic(self):
+        pass
 
-def GameScreen():
-    global game_start, countdown
-    screen.fill((250, 250, 250))
-    game_text = start_font.render("START", True, (150, 150, 150))
-    game_rect = game_text.get_rect(center=(width // 2, height // 2 - 130))
-    screen.blit(game_text, game_rect)
+    def check_collisions(self):
+        pass
 
-'''
-    if not game_start:
-        pygame.time.get.ticks()
+    # 시작 화면
+    def start_screen(self):
+        self.screen.fill(WHITE)
+        # 제목
+        title_text = self.TITLE_FONT.render("<Break OUT>", True, BLACK)
+        title_rect = title_text.get_rect(center=(WIDTH//2, HEIGHT//2-180))
+        self.screen.blit(title_text, title_rect)
+        # 시작 버튼
+        pygame.draw.ellipse(self.screen, RED, self.START_BUTTON)
+        start_button_text = self.ANY_FONT.render("Start", True, WHITE)
+        self.screen.blit(start_button_text, start_button_text.get_rect(center=(self.START_BUTTON.center)))
+        # 기록 버튼
+        pygame.draw.ellipse(self.screen, GRAY, self.RECODE_BUTTON)
+        recode_button_text = self.ANY_FONT.render("Recode", True, WHITE)
+        self.screen.blit(recode_button_text, recode_button_text.get_rect(center=(self.RECODE_BUTTON.center)))
+        # 나가기 버튼
+        pygame.draw.ellipse(self.screen, BLACK, self.EXIT_BUTTON)
+        exit_button_text = self.ANY_FONT.render("Exit", True, WHITE)
+        self.screen.blit(exit_button_text, exit_button_text.get_rect(center=(self.EXIT_BUTTON.center)))
 
-    else :
-        screen.fill((250, 250, 250))
-'''
-def RecodeScreen():
-    screen.fill((250, 250, 250))
-    recode_text = title_font.render("Recode", True, (0, 0, 0))
-    recode_rect = recode_text.get_rect(center=(width // 2, 80))
-    screen.blit(recode_text, recode_rect)
+    # 게임 화면
+    def game_screen(self):
+        self.screen.fill(WHITE)
 
-    #Back Button
-    pygame.draw.ellipse(screen, (50, 50, 50), back_button)
-    exit_button_text = any_font.render("Back", True, (255, 255, 255))
-    exit_button_rect = exit_button_text.get_rect(center=(exit_button.center))
-    screen.blit(exit_button_text, exit_button_rect)
+        # 카운트다운 로직
+        if not self.game_start:
+            elapsed_time = (pygame.time.get_ticks() - self.countdown_start_ticks) /100
+            if elapsed_time < self.countdown_time:
+                countdowns_sec = self.countdown_time- int(elapsed_time)
+                countdown_text = self.START_FONT.render(str(countdowns_sec), True, GRAY)
+                text_rect = countdown_text.get_rect(center=(WIDTH//2, HEIGHT//2))
+                self.screen.blit(countdown_text, text_rect)
+            else:
+                self.game_start = True
 
+        # 게임 로직 업데이트, 그리기
+        if self.game_start:
+            self.game_logic()
+            self.check_collisions()
 
-# Game
-while running:
-    ControlGame()
-    if screen_state == "start":
-        StartScreen()
-    elif screen_state == "game":
-        GameScreen()
-    elif screen_state == "recode":
-        RecodeScreen()
-    pygame.display.flip()
-    clock.tick(60)
+        self.all_sprites.draw(self.screen)
+
+    def recode_screen(self):
+        self.screen.fill(WHITE)
+        recode_text = self.TITLE_FONT.render("Recode", True, BLACK)
+        recode_rect = recode_text.get_rect(center=(WIDTH//2, 80))
+        self.screen.blit(recode_text, recode_rect)
+
+        # Back Button
+        pygame.draw.ellipse(self.screen, BLACK, self.BACK_BUTTON)
+        back_button_text = self.ANY_FONT.render("Back", True, WHITE)
+        self.screen.blit(back_button_text, back_button_text.get_rect(center=(self.BACK_BUTTON.center)))
+
+    # 메인 루프
+    def run(self):
+        while self.running:
+            self.handle_input()
+
+            if self.screen_state == "start":
+                self.start_screen()
+            elif self.screen_state == "game":
+                self.game_screen()
+            elif self.screen_state == "recode":
+                self.recode_screen()
+
+            pygame.display.flip()
+            self.clock.tick(FPS)
+
+if __name__ == '__main__':
+    game = BreakOutGame()
+    game.run()
+    pygame.quit()
+    # sys.exit()
