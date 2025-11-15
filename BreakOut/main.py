@@ -2,7 +2,7 @@ import pygame
 import random
 
 # 상수 정의
-WIDTH, HEIGHT = 360, 640
+WIDTH, HEIGHT = 366, 640
 WHITE = (255, 255, 255)
 BLACK = (0, 0, 0)
 RED = (255, 0, 0)
@@ -15,9 +15,13 @@ class Block(pygame.sprite.Sprite):
     def __init__(self, x, y, color):
         super().__init__()
         # 벽돌 크기
-        self.w, self.h = 40, 20
+        self.w, self.h = 60, 30
         self.image = pygame.Surface([self.w, self.h])
-        self.image.fill(color)
+        self.image.fill(BLACK)
+
+        inner_rect = pygame.Rect(1, 1, self.w-2, self.h-2)
+        pygame.draw.rect(self.image, color, inner_rect)
+
         # 벽돌 위치
         self.rect = self.image.get_rect()
         self.rect.x = x
@@ -62,17 +66,35 @@ class BreakOutGame:
 
         self.creat_blocks()
 
-    def creat_blocks(self):
-        colors = [RED, (255, 255, 0), (255, 165, 0), (0, 128, 0)]
-        for row_index in range(4):
-            for col_index in range(5):
-                x = 30+col_index*(40+20)
-                y = 50+row_index*(20+10)
-                color = colors[row_index]
+        self.countdown_time = 3
+        self.GO_display_time = 1.0
+        self.TOTAL_COUNTDOWN_TIME = self.countdown_time + self.GO_display_time
+        self.countdown_start_ticks = 0
 
-                block = Block(x, y, color)
-                self.blocks.add(block)
-                self.all_sprites.add(block)
+    def creat_blocks(self):
+        BLOCK_COLOR = (255, 255, 0)
+        block_w, block_h = 60, 30
+        cols, rows = 6, 6
+        total_blocks_to_create = 30
+
+        total_blocks_width = block_w*cols
+        padding_x = (WIDTH-(cols*block_w))//2
+        padding_y = 50
+
+        potential_positions = []
+        for row_index in range(rows):
+            for col_index in range(cols):
+                potential_positions.append((row_index, col_index))
+
+        selected_positions = random.sample(potential_positions, total_blocks_to_create)
+
+        for row_index, col_index in selected_positions:
+            x = padding_x + col_index*block_w
+            y = padding_y + row_index*block_h
+
+            block = Block(x, y, BLOCK_COLOR)
+            self.blocks.add(block)
+            self.all_sprites.add(block)
 
     def handle_input(self):
         for event in pygame.event.get():
@@ -123,12 +145,23 @@ class BreakOutGame:
 
         # 카운트다운 로직
         if not self.game_start:
-            elapsed_time = (pygame.time.get_ticks() - self.countdown_start_ticks) /100
+            elapsed_time = (pygame.time.get_ticks() - self.countdown_start_ticks) /1000
+
             if elapsed_time < self.countdown_time:
-                countdowns_sec = self.countdown_time- int(elapsed_time)
-                countdown_text = self.START_FONT.render(str(countdowns_sec), True, GRAY)
+                countdown_sec = self.countdown_time - int(elapsed_time)
+                
+                if countdown_sec < 1:
+                    countdown_sec = 1
+
+                countdown_text = self.START_FONT.render(str(countdown_sec), True, GRAY)
                 text_rect = countdown_text.get_rect(center=(WIDTH//2, HEIGHT//2))
                 self.screen.blit(countdown_text, text_rect)
+
+            elif elapsed_time < self.TOTAL_COUNTDOWN_TIME:
+                go_text = self.START_FONT.render("GO!", True, RED)
+                text_rect = go_text.get_rect(center=(WIDTH//2, HEIGHT//2))
+                self.screen.blit(go_text, text_rect)
+
             else:
                 self.game_start = True
 
